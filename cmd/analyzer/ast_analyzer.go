@@ -25,15 +25,46 @@ func (a *Analyzer) AnalyzeFile(filepath string) (*ast.File, error) {
 	return node, nil
 }
 
-// FindFunctionCalls finds all function calls in the AST
-func (a *Analyzer) FindFunctionCalls(node ast.Node) []string {
-	var calls []string
+// FindFunctionCalls finds all function calls in the AST with their arguments
+func (a *Analyzer) FindFunctionCalls(node ast.Node) map[string][]string {
+	calls := make(map[string][]string)
 
 	ast.Inspect(node, func(n ast.Node) bool {
 		if call, ok := n.(*ast.CallExpr); ok {
-			if ident, ok := call.Fun.(*ast.Ident); ok {
-				calls = append(calls, ident.Name)
+			var funcName string
+			switch fun := call.Fun.(type) {
+			case *ast.Ident:
+				funcName = fun.Name
+			case *ast.SelectorExpr:
+				if pkg, ok := fun.X.(*ast.Ident); ok {
+					funcName = pkg.Name + "." + fun.Sel.Name
+				}
 			}
+
+			// Extract arguments
+			var args []string
+			for _, arg := range call.Args {
+				switch v := arg.(type) {
+				case *ast.BasicLit:
+					// For literal values (strings, numbers, etc.)
+					args = append(args, v.Value)
+				case *ast.Ident:
+					// For variable names
+					args = append(args, "$"+v.Name)
+				case *ast.SelectorExpr:
+					// For package-qualified values (e.g., os.Stdout)
+					if pkg, ok := v.X.(*ast.Ident); ok {
+						args = append(args, pkg.Name+"."+v.Sel.Name)
+					}
+				case *ast.CallExpr:
+					// For nested function calls
+					args = append(args, "nested_call")
+				default:
+					args = append(args, "complex_expr")
+				}
+			}
+
+			calls[funcName] = args
 		}
 		return true
 	})

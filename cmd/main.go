@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang-repo-inspector/cmd/analyzer"
 )
@@ -28,7 +29,8 @@ func main() {
 	}
 
 	// Walk through all .go files in the directory
-	var allImports, allStructs, allFunctionCalls []string
+	var allImports, allStructs []string
+	allFunctionCalls := make(map[string][]string)
 	err = filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -45,7 +47,10 @@ func main() {
 
 			allImports = append(allImports, imports...)
 			allStructs = append(allStructs, structs...)
-			allFunctionCalls = append(allFunctionCalls, functionCalls...)
+			// Merge function calls
+			for name, args := range functionCalls {
+				allFunctionCalls[name] = args
+			}
 		}
 		return nil
 	})
@@ -65,7 +70,11 @@ func main() {
 	}
 
 	fmt.Println("\nFunction calls found:")
-	for _, call := range allFunctionCalls {
-		fmt.Printf("  - %s\n", call)
+	for name, args := range allFunctionCalls {
+		if len(args) > 0 {
+			fmt.Printf("  - %s(%s)\n", name, strings.Join(args, ", "))
+		} else {
+			fmt.Printf("  - %s()\n", name)
+		}
 	}
 }
